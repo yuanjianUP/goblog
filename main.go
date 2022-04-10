@@ -3,21 +3,21 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"goblog/pkg/database"
+	"goblog/pkg/logger"
+	"goblog/pkg/route"
+	"goblog/pkg/types"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 	"unicode/utf8"
 
-	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
-//articlesFormData创建博文表单数据
 type ArticlesFormData struct {
 	Title, Body string
 	URL         *url.URL
@@ -25,39 +25,6 @@ type ArticlesFormData struct {
 }
 
 var router = mux.NewRouter().StrictSlash(true) //strictslash可以使go和go/都能正确访问
-var db *sql.DB
-
-func initDB() {
-	var err error
-	config := mysql.Config{
-		User:                 "homestead",
-		Passwd:               "secret",
-		Addr:                 "127.0.0.1:33060",
-		Net:                  "tcp",
-		DBName:               "goblog",
-		AllowNativePasswords: true,
-	}
-	//准备数据库连减池
-	db, err = sql.Open("mysql", config.FormatDSN())
-	checkError(err)
-
-	//设置最大连接数
-	db.SetMaxOpenConns(25)
-	//设置最大空闲连接数
-	db.SetMaxIdleConns(25)
-	//设置每个链接过期时间
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	//尝试连接，失败会报错
-	err = db.Ping()
-	checkError(err)
-}
-
-func checkError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "<h1>hello,欢迎来到goblog</h1>")
@@ -101,8 +68,7 @@ func validateArticleFormData(title string, body string) map[string]string {
 	return errors
 }
 func articlesShowHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := route.GetRouteVariable("id", r)
 	//2.读取对应文章列表
 	article, err := getArticleByID(id)
 	//如果出现错误
@@ -113,39 +79,25 @@ func articlesShowHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "404文章未找到")
 		} else {
 			//数据库错误
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500服务器内部错误")
 		}
 	} else {
 		//读取成功
 		tmpl, err := template.New("show.gohtml").Funcs(template.FuncMap{
-			"RouteName2URL": RouteName2URL,
-			"Int64ToString": Int64ToString,
+			"RouteName2URL": route.Name2URL,
+			"Int64ToString": types.Int64ToString,
 		}).ParseFiles("resources/views/articles/show.gohtml")
-		checkError(err)
+		logger.LogError(err)
 		tmpl.Execute(w, article)
 	}
 }
 
-//通过路由名称来获取URL
-func RouteName2URL(routeName string, pairs ...string) string {
-	url, err := router.Get(routeName).URL(pairs...)
-	if err != nil {
-		checkError(err)
-		return ""
-	}
-	return url.String()
-}
-
-//将int64转换为string
-func Int64ToString(num int64) string {
-	return strconv.FormatInt(num, 10)
-}
 func articlesIndexHandler(w http.ResponseWriter, r *http.Request) {
 	//执行查询语句
 	rows, err := db.Query("SELECT * FROM articles")
-	checkError(err)
+	logger.LogError(err)
 	defer rows.Close()
 
 	var articles []Article
@@ -153,18 +105,18 @@ func articlesIndexHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var article Article
 		err := rows.Scan(&article.ID, &article.Title, &article.Body)
-		checkError(err)
+		logger.LogError(err)
 		//将article追加到articles的这个数据中
 		articles = append(articles, article)
 	}
 
 	//检测遍历时是否发生错误
 	err = rows.Err()
-	checkError(err)
+	logger.LogError(err)
 
 	//加载模板
 	tmpl, err := template.ParseFiles("resources/views/articles/index.gohtml")
-	checkError(err)
+	logger.LogError(err)
 
 	//渲染模板，将所有文章的数据传输进去
 	tmpl.Execute(w, articles)
@@ -179,7 +131,7 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 		if lastInsertID > 0 {
 			fmt.Fprint(w, "插入成功，ID为"+strconv.FormatInt(lastInsertID, 10))
 		} else {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500 服务器内部错误")
 		}
@@ -268,15 +220,6 @@ func removeTrailingSlash(next http.Handler) http.Handler { //移除路由后的/
 		next.ServeHTTP(w, r)
 	})
 }
-func createTable() {
-	createArticlesSQL := `CREATE TABLE IF NOT EXISTS articles(
-		id bigint(20) PRIMARY KEY AUTO_INCREMENT NOT NULL,
-		title varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-		body longtext COLLATE utf8mb4_unicode_ci
-	);`
-	_, err := db.Exec(createArticlesSQL)
-	checkError(err)
-}
 
 func articlesEditHandler(w http.ResponseWriter, r *http.Request) {
 	//获取参数
@@ -293,7 +236,7 @@ func articlesEditHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "404未找到数据")
 		} else {
 			//数据库错误
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500 服务器错误")
 		}
@@ -307,23 +250,21 @@ func articlesEditHandler(w http.ResponseWriter, r *http.Request) {
 			Errors: nil,
 		}
 		tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
-		checkError(err)
+		logger.LogError(err)
 		tmpl.Execute(w, data)
 	}
 }
 func articlesUpdateHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
+	id := route.GetRouteVariable("id", r)
 	_, err := getArticleByID(id)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprint(w, "404 未找到数据")
 		} else {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500 数据库错误")
 		}
@@ -339,7 +280,7 @@ func articlesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 			rs, err := db.Exec(query, title, body, id)
 
 			if err != nil {
-				checkError(err)
+				logger.LogError(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, "500服务器内部错误")
 			}
@@ -360,7 +301,7 @@ func articlesUpdateHandler(w http.ResponseWriter, r *http.Request) {
 				Errors: errors,
 			}
 			tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
-			checkError(err)
+			logger.LogError(err)
 			tmpl.Execute(w, data)
 		}
 	}
@@ -372,18 +313,18 @@ func articlesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	article, err := getArticleByID(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprint(w, "404 未找到数据")
 		} else {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500 服务器错误")
 		}
 	} else {
 		rowsAffected, err := article.Delete()
 		if err != nil {
-			checkError(err)
+			logger.LogError(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "500 服务器错误")
 		} else {
@@ -401,7 +342,7 @@ func articlesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 func (a Article) Link() string { //语言函数方法
 	showURL, err := router.Get("articles.show").URL("id", strconv.FormatInt(a.ID, 10))
 	if err != nil {
-		checkError(err)
+		logger.LogError(err)
 		return ""
 	}
 	return showURL.String()
@@ -417,8 +358,10 @@ func (a Article) Delete() (RowsAffected int64, err error) {
 	return 0, nil
 }
 func main() {
-	initDB()
-	createTable()
+	database.Initialize()
+
+	route.Initialize()
+	router = route.Router
 	router.HandleFunc("/", homeHandler).Methods("GET").Name("home")
 	router.HandleFunc("/about", aboutHandler).Methods("GET").Name("about")
 
@@ -436,5 +379,5 @@ func main() {
 	//使用中间件：强制内容类型为HTML
 	router.Use(forceHTMLMiddleware)
 
-	http.ListenAndServe(":3000", removeTrailingSlash(router))
+	http.ListenAndServe(":8090", removeTrailingSlash(router))
 }
