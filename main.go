@@ -3,10 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"goblog/bootstrap"
 	"goblog/pkg/database"
 	"goblog/pkg/logger"
 	"goblog/pkg/route"
-	"goblog/pkg/types"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -43,13 +43,6 @@ type Article struct {
 	ID          int64
 }
 
-func getArticleByID(id string) (Article, error) {
-	article := Article{}
-	query := "SELECT * FROM articles WHERE id = ?"
-	err := db.QueryRow(query, id).Scan(&article.ID, &article.Title, &article.Body)
-	return article, err
-}
-
 //表单验证
 func validateArticleFormData(title string, body string) map[string]string {
 	errors := make(map[string]string)
@@ -66,32 +59,6 @@ func validateArticleFormData(title string, body string) map[string]string {
 		errors["body"] = "内容长度需要大于或等于10个字节"
 	}
 	return errors
-}
-func articlesShowHandler(w http.ResponseWriter, r *http.Request) {
-	id := route.GetRouteVariable("id", r)
-	//2.读取对应文章列表
-	article, err := getArticleByID(id)
-	//如果出现错误
-	if err != nil {
-		if err == sql.ErrNoRows {
-			//3.1数据未找到
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprint(w, "404文章未找到")
-		} else {
-			//数据库错误
-			logger.LogError(err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "500服务器内部错误")
-		}
-	} else {
-		//读取成功
-		tmpl, err := template.New("show.gohtml").Funcs(template.FuncMap{
-			"RouteName2URL": route.Name2URL,
-			"Int64ToString": types.Int64ToString,
-		}).ParseFiles("resources/views/articles/show.gohtml")
-		logger.LogError(err)
-		tmpl.Execute(w, article)
-	}
 }
 
 func articlesIndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -359,13 +326,12 @@ func (a Article) Delete() (RowsAffected int64, err error) {
 }
 func main() {
 	database.Initialize()
-
-	route.Initialize()
-	router = route.Router
+	db = database.DB
+	bootstrap.SetupDB()
+	router = bootstrap.SetupRoute()
 	router.HandleFunc("/", homeHandler).Methods("GET").Name("home")
 	router.HandleFunc("/about", aboutHandler).Methods("GET").Name("about")
 
-	router.HandleFunc("/articles/{id:[0-9]+}", articlesShowHandler).Methods("GET").Name("articles.show")
 	router.HandleFunc("/articles", articlesIndexHandler).Methods("GET").Name("articles.index")
 	router.HandleFunc("/articles", articlesStoreHandler).Methods("POST").Name("articles.store")
 

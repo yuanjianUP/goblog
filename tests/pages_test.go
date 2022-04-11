@@ -9,7 +9,7 @@ import (
 )
 
 func TestHomePage(t *testing.T) { //单元测试
-	baseURL := "http://localhost:3000"
+	baseURL := "http://localhost:8090"
 
 	//请求 -- 模拟用户访问浏览器
 	var tests = []struct {
