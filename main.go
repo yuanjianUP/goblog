@@ -24,6 +24,7 @@ type ArticlesFormData struct {
 	Errors      map[string]string
 }
 
+var db = database.DB
 var router = mux.NewRouter().StrictSlash(true) //strictslash可以使go和go/都能正确访问
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -324,10 +325,16 @@ func (a Article) Delete() (RowsAffected int64, err error) {
 	}
 	return 0, nil
 }
+func getArticleByID(id string) (Article, error) {
+	article := Article{}
+	query := "SELECT * FROM articles WHERE id = ?"
+	err := db.QueryRow(query, id).Scan(&article.ID, &article.Title, &article.Body)
+	return article, err
+}
 func main() {
 	database.Initialize()
-	db = database.DB
 	bootstrap.SetupDB()
+
 	router = bootstrap.SetupRoute()
 	router.HandleFunc("/", homeHandler).Methods("GET").Name("home")
 	router.HandleFunc("/about", aboutHandler).Methods("GET").Name("about")
