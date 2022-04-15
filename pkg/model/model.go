@@ -16,7 +16,9 @@ func ConnectDB() *gorm.DB {
 	})
 
 	// 准备数据库连接池
-	DB, err = gorm.Open(config, &gorm.Config{})
+	DB, err = gorm.Open(config, &gorm.Config{
+		// Logger: gormlogger.Default.LogMode(gormlogger.Info), //调试
+	})
 
 	logger.LogError(err)
 
