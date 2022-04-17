@@ -102,7 +102,7 @@ func (*ArticlesController) Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//添加页
+//添加动作
 func (*ArticlesController) Store(w http.ResponseWriter, r *http.Request) {
 	title := r.PostFormValue("title")
 	body := r.PostFormValue("body")
@@ -133,5 +133,90 @@ func (*ArticlesController) Store(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		tmpl.Execute(w, data)
+	}
+}
+
+func (*ArticlesController) Edit(w http.ResponseWriter, r *http.Request) {
+	//获取参数
+	id := route.GetRouteVariable("id", r)
+	//读取对应的数据
+	article, err := article.Get(id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			//未找到数据
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, "404未找到数据")
+		} else {
+			//数据库错误
+			logger.LogError(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "500 服务器错误")
+		}
+	} else {
+		//读取成功，显示表单
+		updateURL := route.Name2URL("articles.update", "id", id)
+		data := ArticlesFormData{
+			Title:  article.Title,
+			Body:   article.Body,
+			URL:    updateURL,
+			Errors: nil,
+		}
+		tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
+		logger.LogError(err)
+		err = tmpl.Execute(w, data)
+		logger.LogError(err)
+	}
+}
+
+func (*ArticlesController) Update(w http.ResponseWriter, r *http.Request) {
+	id := route.GetRouteVariable("id", r)
+	_article, err := article.Get(id)
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			logger.LogError(err)
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, "404 未找到数据")
+		} else {
+			logger.LogError(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "500 数据库错误")
+		}
+	} else {
+		//表单验证
+		title := r.PostFormValue("title")
+		body := r.PostFormValue("body")
+		errors := validateArticleFormData(title, body)
+
+		if len(errors) == 0 {
+			//验证通过
+			rowsAffected, err := _article.Update()
+
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "500服务器内部错误")
+				return
+			}
+
+			//更新成功，跳转到文章详情页
+			if rowsAffected > 0 {
+				showURL := route.Name2URL("articles.show", "id", id)
+				http.Redirect(w, r, showURL, http.StatusFound)
+			} else {
+				fmt.Fprint(w, "您没有做任何更改")
+			}
+		} else {
+			updateURL := route.Name2URL("articles.update", "id", id)
+			data := ArticlesFormData{
+				Title:  title,
+				Body:   body,
+				URL:    updateURL,
+				Errors: errors,
+			}
+			tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
+			logger.LogError(err)
+			err = tmpl.Execute(w, data)
+			logger.LogError(err)
+		}
 	}
 }
