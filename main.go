@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
+	"goblog/app/http/middlewares"
 	"goblog/bootstrap"
-	"goblog/pkg/database"
 	"goblog/pkg/route"
 	"net/http"
-	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 
@@ -26,36 +25,7 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "<h1>请求页面未找到 :(</h1>"+"<p>如有疑问，请联系我们</p>")
 }
 
-//声明存储数据库数据
-type Article struct {
-	Title, Body string
-	ID          int64
-}
-
-//中间件
-func forceHTMLMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//1.设置标头
-		w.Header().Set("Content-Type", "text/html;charset=utf-8")
-		//2.继续处理请求
-		if r.URL.Path != "/" {
-			r.URL.Path = strings.TrimSuffix(r.URL.Path, "/") //去掉右边的/
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func removeTrailingSlash(next http.Handler) http.Handler { //移除路由后的/符号
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
-		}
-		//请求传递下去
-		next.ServeHTTP(w, r)
-	})
-}
 func main() {
-	database.Initialize()
 	bootstrap.SetupDB()
 
 	router = bootstrap.SetupRoute()
@@ -66,7 +36,5 @@ func main() {
 	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 
 	//使用中间件：强制内容类型为HTML
-	router.Use(forceHTMLMiddleware)
-
-	http.ListenAndServe(":8090", removeTrailingSlash(router))
+	http.ListenAndServe(":8090", middlewares.RemoveTrailingSlash(router))
 }
