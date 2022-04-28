@@ -5,7 +5,7 @@ import (
 	"goblog/pkg/logger"
 	"goblog/pkg/model/article"
 	"goblog/pkg/route"
-	"goblog/pkg/types"
+	"goblog/pkg/view"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -56,14 +56,7 @@ func (*ArticlesController) Show(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "500服务器内部错误")
 		}
 	} else {
-		//读取成功
-		tmpl, err := template.New("show.gohtml").Funcs(template.FuncMap{
-			"RouteName2URL":  route.Name2URL,
-			"Uint64ToString": types.Uint64ToString,
-		}).ParseFiles("resources/views/articles/show.gohtml")
-		logger.LogError(err)
-		err = tmpl.Execute(w, article)
-		logger.LogError(err)
+		view.Render(w, "articles/show", article)
 	}
 }
 

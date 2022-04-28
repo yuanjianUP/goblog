@@ -1,6 +1,7 @@
 package article
 
 import (
+	"goblog/app/models"
 	"goblog/pkg/logger"
 	"goblog/pkg/model"
 	"goblog/pkg/route"
@@ -10,8 +11,8 @@ import (
 
 //声明存储数据库数据
 type Article struct {
+	models.BaseModel
 	Title, Body string
-	ID          uint64
 }
 
 func Get(idstr string) (Article, error) {
