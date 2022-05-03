@@ -9,14 +9,16 @@ import (
 	"text/template"
 )
 
-func Render(w io.Writer, name string, data interface{}) {
+func Render(w io.Writer, data interface{}, tplFiles ...string) {
 	viewDir := "resources/views/"
-	name = strings.Replace(name, ".", "/", -1)
+	for i, f := range tplFiles {
+		tplFiles[i] = viewDir + strings.Replace(f, ".", "/", -1) + ".gohtml"
+	}
 	//所有布局模版文件slice
 	files, err := filepath.Glob(viewDir + "/layouts/*.gohtml")
 	logger.LogError(err)
 	//在slice里新增我们目标文件
-	newFiles := append(files, viewDir+name+".gohtml")
+	newFiles := append(files, tplFiles...)
 	//读取成功
 	tmpl, err := template.New("show.gohtml").
 		Funcs(template.FuncMap{

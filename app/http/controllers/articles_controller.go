@@ -7,7 +7,6 @@ import (
 	"goblog/pkg/route"
 	"goblog/pkg/view"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"text/template"
 	"unicode/utf8"
@@ -19,6 +18,7 @@ type ArticlesController struct {
 }
 type ArticlesFormData struct {
 	Title, Body, URL string
+	Article          article.Article
 	Errors           map[string]string
 }
 
@@ -56,7 +56,7 @@ func (*ArticlesController) Show(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "500服务器内部错误")
 		}
 	} else {
-		view.Render(w, "articles/show", article)
+		view.Render(w, article, "articles/show")
 	}
 }
 
@@ -68,36 +68,14 @@ func (*ArticlesController) Index(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "500服务器错误")
 	} else {
-		viewDir := "resources/views"
-		files, err := filepath.Glob(viewDir + "/layouts/*.gohtml")
-		logger.LogError(err)
-		newFiles := append(files, viewDir+"/articles/index.gohtml")
-		tmpl, err := template.ParseFiles(newFiles...)
-		logger.LogError(err)
-		err = tmpl.ExecuteTemplate(w, "app", articles)
-		logger.LogError(err)
+		view.Render(w, articles, "articles.index")
 
 	}
-
 }
 
 //添加页
 func (*ArticlesController) Create(w http.ResponseWriter, r *http.Request) {
-	storeURL := route.Name2URL("articles.store")
-	data := ArticlesFormData{
-		Title:  "",
-		Body:   "",
-		URL:    storeURL,
-		Errors: nil,
-	}
-	templ, err := template.ParseFiles("resources/views/articles/create.gohtml")
-	if err != nil {
-		panic(err)
-	}
-	err = templ.Execute(w, data)
-	if err != nil {
-		panic(err)
-	}
+	view.Render(w, ArticlesFormData{}, "articles.create", "articles._form_field")
 }
 
 //添加动作
@@ -119,18 +97,12 @@ func (*ArticlesController) Store(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "500 服务器内部错误")
 		}
 	} else {
-		storeURL := route.Name2URL("articles.store")
 		data := ArticlesFormData{
 			Title:  title,
 			Body:   body,
-			URL:    storeURL,
 			Errors: errors,
 		}
-		tmpl, err := template.ParseFiles("resources/views/articles/create.gohtml")
-		if err != nil {
-			panic(err)
-		}
-		tmpl.Execute(w, data)
+		view.Render(w, data, "articles.create")
 	}
 }
 
@@ -152,17 +124,13 @@ func (*ArticlesController) Edit(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		//读取成功，显示表单
-		updateURL := route.Name2URL("articles.update", "id", id)
 		data := ArticlesFormData{
-			Title:  article.Title,
-			Body:   article.Body,
-			URL:    updateURL,
-			Errors: nil,
+			Title:   article.Title,
+			Body:    article.Body,
+			Article: article,
+			Errors:  nil,
 		}
-		tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
-		logger.LogError(err)
-		err = tmpl.Execute(w, data)
-		logger.LogError(err)
+		view.Render(w, data, "articles.edit", "articles._form_field")
 	}
 }
 
