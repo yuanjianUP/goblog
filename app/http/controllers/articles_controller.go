@@ -8,7 +8,6 @@ import (
 	"goblog/pkg/view"
 	"net/http"
 	"strconv"
-	"text/template"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
@@ -179,13 +178,11 @@ func (*ArticlesController) Update(w http.ResponseWriter, r *http.Request) {
 				URL:    updateURL,
 				Errors: errors,
 			}
-			tmpl, err := template.ParseFiles("resources/views/articles/edit.gohtml")
-			logger.LogError(err)
-			err = tmpl.Execute(w, data)
-			logger.LogError(err)
+			view.Render(w, data, "articles/edit", "articles/_form_field")
 		}
 	}
 }
+
 func (*ArticlesController) Delete(w http.ResponseWriter, r *http.Request) {
 	id := route.GetRouteVariable("id", r)
 	//读取对应的文章数据

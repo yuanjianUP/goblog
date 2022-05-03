@@ -9,7 +9,17 @@ import (
 	"text/template"
 )
 
+type D map[string]interface{}
+
 func Render(w io.Writer, data interface{}, tplFiles ...string) {
+	RenderTemplate(w, "app", data, tplFiles...)
+}
+
+func RenderSimple(w io.Writer, data interface{}, tplFiles ...string) {
+	RenderTemplate(w, "simple", data, tplFiles...)
+}
+
+func RenderTemplate(w io.Writer, name string, data interface{}, tplFiles ...string) {
 	viewDir := "resources/views/"
 	for i, f := range tplFiles {
 		tplFiles[i] = viewDir + strings.Replace(f, ".", "/", -1) + ".gohtml"
@@ -26,6 +36,6 @@ func Render(w io.Writer, data interface{}, tplFiles ...string) {
 		}).ParseFiles(newFiles...)
 	logger.LogError(err)
 	//渲染模版，将所有文行数据传输进去
-	err = tmpl.ExecuteTemplate(w, "app", data)
+	err = tmpl.ExecuteTemplate(w, name, data)
 	logger.LogError(err)
 }
