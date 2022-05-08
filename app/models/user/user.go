@@ -7,7 +7,9 @@ import (
 type User struct {
 	models.BaseModel
 
-	Name     string `gorm:"column:name;type:varchar(255);not null;unique"`
-	Email    string `gorm:"column:email;type:varchar(255);not null;default'';unique"`
-	Password string `gorm:"column:password;type:varchar(255);not null;default '';"`
+	Name     string `gorm:"type:varchar(255);not null;unique" valid:"name"`
+	Email    string `gorm:"type:varchar(255);not null;default'';unique" valid:"email"`
+	Password string `gorm:"type:varchar(255);not null;default '';" valid:"password"`
+	//gorm:"-" -- 设置gorm在读写时掠过次字段
+	PasswordConfirm string `gorm:"-" valid:"password_confirm"`
 }
