@@ -37,3 +37,9 @@ func (*AuthController) DoRegister(w http.ResponseWriter, r *http.Request) {
 	//验证通过，入库并跳转
 	//表单不通过
 }
+func (*AuthController) Login(w http.ResponseWriter, r *http.Request) {
+	view.RenderSimple(w, view.D{}, "auth.login")
+}
+func (*AuthController) Dologin(w http.ResponseWriter, r *http.Request) {
+
+}
